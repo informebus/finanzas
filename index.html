@@ -170,6 +170,25 @@
 
     .tx-list-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:6px 14px;box-shadow:var(--shadow);}
 
+    /* ========== ESTILOS DE PRÉSTAMOS ========== */
+    .loan-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:12px;position:relative;}
+    .loan-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+    .loan-title{font-size:15px;font-weight:600;color:var(--ink);}
+    .loan-badge{font-size:10.5px;font-weight:600;padding:4px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:0.5px;}
+    .badge-debo{background:var(--coral-soft);color:var(--coral);}
+    .badge-medeben{background:var(--sage-soft);color:var(--sage);}
+    .loan-details{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);margin-bottom:8px;}
+    .loan-details span strong{color:var(--ink);font-weight:600;}
+    .loan-bar-wrap{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+    .loan-bar-fill{height:100%;border-radius:3px;transition:width 0.3s;}
+    .fill-debo{background:var(--coral);}
+    .fill-medeben{background:var(--sage);}
+    .loan-status{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-soft);font-weight:500;}
+    .loan-actions{display:flex;gap:8px;margin-top:14px;border-top:1px dashed var(--line);padding-top:14px;}
+    .loan-btn{flex:1;padding:10px;border-radius:9px;border:none;font-weight:600;font-size:13.5px;cursor:pointer;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px;}
+    .lbtn-pay{background:var(--ink);color:var(--paper);}
+    .lbtn-del{background:var(--paper);color:var(--ink-soft);border:1px solid var(--line);}
+    
     .tabbar{
       position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);
       display:flex;padding:8px 10px calc(10px + env(safe-area-inset-bottom));z-index:20;
@@ -188,8 +207,8 @@
       flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--line);background:var(--paper);
       color:var(--ink-soft);font-weight:600;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif;
     }
-    .type-toggle button.sel.gasto{border-color:var(--coral);color:var(--coral);background:var(--coral-soft);}
-    .type-toggle button.sel.ingreso{border-color:var(--sage);color:var(--sage);background:var(--sage-soft);}
+    .type-toggle button.sel.gasto, .type-toggle button.sel.a_pagar{border-color:var(--coral);color:var(--coral);background:var(--coral-soft);}
+    .type-toggle button.sel.ingreso, .type-toggle button.sel.otorgado{border-color:var(--sage);color:var(--sage);background:var(--sage-soft);}
 
     label{display:block;font-size:12.5px;color:var(--ink-soft);margin:14px 0 6px;font-weight:500;}
     label:first-of-type{margin-top:0;}
@@ -421,6 +440,22 @@
     <div class="tx-list-card" id="txList"></div>
   </div>
 
+  <!-- VISTA: PRÉSTAMOS -->
+  <div id="view-prestamos" class="view">
+    <div class="top"><h1 style="font-size:21px;font-weight:600;margin-bottom:16px;">Préstamos</h1></div>
+    <div class="type-toggle">
+      <button type="button" class="sel a_pagar" id="btnLoanAPagar">A Pagar (Pedí)</button>
+      <button type="button" id="btnLoanOtorgado">Otorgados (Presté)</button>
+    </div>
+    
+    <div id="loansList" style="margin-bottom:24px;"></div>
+    
+    <button class="add-cat-btn" id="addLoanBtn" style="border:none;background:var(--ink);color:var(--paper);">+ Cargar nuevo préstamo</button>
+    
+    <div class="section-title" style="margin-top:30px;">Historial (Saldados)</div>
+    <div id="loansSettledList"></div>
+  </div>
+
   <div id="view-agregar" class="view">
     <div class="top"><h1 id="agregarTitle">Agregar movimiento</h1></div>
     <form id="txForm">
@@ -503,6 +538,7 @@
 <div class="tabbar">
   <button class="tab active" data-view="resumen"><span class="ic">◐</span>Resumen</button>
   <button class="tab" data-view="movimientos"><span class="ic">☰</span>Movimientos</button>
+  <button class="tab" data-view="prestamos"><span class="ic">🤝</span>Préstamos</button>
   <button class="tab" data-view="agregar"><span class="ic">+</span>Agregar</button>
 </div>
 
@@ -591,6 +627,14 @@
       INC_CATS.forEach(c=>catMap['ingreso:'+c.id]=c);
       catColor = {};
       EXP_CATS.forEach((c,i)=> catColor[c.id] = PALETTE[i % PALETTE.length]);
+      
+      // Categorías de sistema ocultas para Préstamos
+      catMap['ingreso:prestamo_recibido'] = {name:'Préstamo recibido', icon:'🏦'};
+      catMap['gasto:prestamo_otorgado'] = {name:'Préstamo otorgado', icon:'💸'};
+      catMap['gasto:pago_cuota'] = {name:'Pago cuota de préstamo', icon:'📉'};
+      catMap['ingreso:cobro_cuota'] = {name:'Cobro cuota de préstamo', icon:'📈'};
+      catColor['prestamo_otorgado'] = '#A6763F'; 
+      catColor['pago_cuota'] = '#C77FA0'; 
     }
     rebuildIndexes();
 
@@ -603,11 +647,16 @@
     }
     function newCatId(prefix){ return prefix+'_'+Date.now().toString(36); }
 
-    // ================= Transacciones =================
+    // ================= Transacciones y Préstamos =================
     const TX_KEY = 'finanzas_transacciones_v1';
     let txs = [];
     try{ const raw = localStorage.getItem(TX_KEY); txs = raw ? JSON.parse(raw) : []; }catch(e){ txs = []; }
     function saveTx(){ try{ localStorage.setItem(TX_KEY, JSON.stringify(txs)); }catch(e){ console.error('No se pudo guardar', e); } }
+
+    const LOANS_KEY = 'finanzas_prestamos_v1';
+    let loans = [];
+    try{ const raw = localStorage.getItem(LOANS_KEY); loans = raw ? JSON.parse(raw) : []; }catch(e){ loans = []; }
+    function saveLoans(){ try{ localStorage.setItem(LOANS_KEY, JSON.stringify(loans)); }catch(e){} }
 
     // ================= Ahorros =================
     const SV_KEY = 'finanzas_ahorros_v1';
@@ -712,7 +761,8 @@
 
       const byCat = {};
       monthTxs.filter(t=>t.type==='gasto').forEach(t=>{
-        const topId = topParent(t.category);
+        // Mapeo seguro en caso de que sea categoría oculta
+        const topId = (t.category.includes('prestamo') || t.category.includes('cuota')) ? t.category : topParent(t.category);
         byCat[topId] = (byCat[topId]||0) + t.amount;
       });
       const entries = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
@@ -735,7 +785,7 @@
         const CENTER = size/2, R = size * 0.43;
 
         entries.forEach(([catId, amt])=>{
-          const meta = catMap['gasto:'+catId] || {name:catId, icon:'📌'};
+          const meta = catMap['gasto:'+catId] || catMap['ingreso:'+catId] || {name:catId, icon:'📌'};
           const color = catColor[catId] || '#999';
           const startPct = (cum/total)*100; cum += amt; const endPct = (cum/total)*100;
           gradientParts.push(`${color} ${startPct.toFixed(2)}% ${endPct.toFixed(2)}%`);
@@ -871,11 +921,258 @@
       });
     }
 
+    // ================= Préstamos =================
+    let curLoanType = 'a_pagar';
+
+    document.getElementById('btnLoanAPagar').addEventListener('click', ()=>{
+      curLoanType = 'a_pagar';
+      document.getElementById('btnLoanAPagar').classList.add('sel', 'a_pagar');
+      document.getElementById('btnLoanOtorgado').classList.remove('sel', 'otorgado');
+      renderLoans();
+    });
+    document.getElementById('btnLoanOtorgado').addEventListener('click', ()=>{
+      curLoanType = 'otorgado';
+      document.getElementById('btnLoanOtorgado').classList.add('sel', 'otorgado');
+      document.getElementById('btnLoanAPagar').classList.remove('sel', 'a_pagar');
+      renderLoans();
+    });
+
+    function renderLoans(){
+      const activeList = document.getElementById('loansList');
+      const settledList = document.getElementById('loansSettledList');
+      activeList.innerHTML = '';
+      settledList.innerHTML = '';
+
+      let hasActive = false;
+      let hasSettled = false;
+
+      loans.filter(l => l.type === curLoanType).sort((a,b) => b.id - a.id).forEach(loan => {
+        const isSettled = loan.paid >= loan.total;
+        const remaining = loan.total - loan.paid;
+        const pct = Math.min(100, Math.max(0, (loan.paid / loan.total) * 100));
+        
+        const badgeClass = loan.type === 'a_pagar' ? 'badge-debo' : 'badge-medeben';
+        const badgeText = loan.type === 'a_pagar' ? 'Debo' : 'Me deben';
+        const fillClass = loan.type === 'a_pagar' ? 'fill-debo' : 'fill-medeben';
+        const actionText = loan.type === 'a_pagar' ? 'Pagar cuota' : 'Cobrar cuota';
+
+        const card = document.createElement('div');
+        card.className = 'loan-card';
+        card.innerHTML = `
+          <div class="loan-header">
+            <div class="loan-title">${loan.name}</div>
+            <div class="loan-badge ${badgeClass}">${badgeText} ${fmt(remaining)}</div>
+          </div>
+          <div class="loan-details">
+            <span>Capital: <strong>${fmt(loan.capital)}</strong></span>
+            <span>Total: <strong>${fmt(loan.total)}</strong></span>
+          </div>
+          <div class="loan-bar-wrap">
+            <div class="loan-bar-fill ${fillClass}" style="width:${pct}%"></div>
+          </div>
+          <div class="loan-status">
+            <span>Pagado: ${fmt(loan.paid)}</span>
+            <span>${pct.toFixed(0)}%</span>
+          </div>
+          ${!isSettled ? `
+            <div class="loan-actions">
+              <button class="loan-btn lbtn-pay" data-id="${loan.id}">${actionText}</button>
+              <button class="loan-btn lbtn-del" data-id="${loan.id}">Eliminar</button>
+            </div>
+          ` : `
+            <div class="loan-actions">
+              <button class="loan-btn lbtn-del" data-id="${loan.id}">Eliminar registro</button>
+            </div>
+          `}
+        `;
+
+        if(isSettled){
+          card.style.opacity = '0.7';
+          settledList.appendChild(card);
+          hasSettled = true;
+        } else {
+          activeList.appendChild(card);
+          hasActive = true;
+        }
+
+        // Eventos
+        const payBtn = card.querySelector('.lbtn-pay');
+        if(payBtn){
+          payBtn.addEventListener('click', () => openPayInstallment(loan));
+        }
+        card.querySelector('.lbtn-del').addEventListener('click', () => {
+          openModal(`
+            <h3>¿Eliminar registro?</h3>
+            <p style="font-size:13.5px;color:var(--ink-soft);">Esto no borrará los movimientos que ya ingresaste al balance, solo borrará esta tarjeta.</p>
+            <div class="modal-actions">
+              <button class="btn-cancel" id="delLoanCancel">Cancelar</button>
+              <button class="btn-danger" id="delLoanConfirm">Eliminar</button>
+            </div>
+          `);
+          document.getElementById('delLoanCancel').addEventListener('click', closeModal);
+          document.getElementById('delLoanConfirm').addEventListener('click', ()=>{
+            loans = loans.filter(l => l.id !== loan.id);
+            saveLoans(); closeModal(); renderLoans();
+          });
+        });
+      });
+
+      if(!hasActive) activeList.innerHTML = `<div class="empty">No tienes préstamos activos en esta categoría.</div>`;
+      if(!hasSettled) settledList.innerHTML = `<div class="empty" style="padding:16px;">No hay préstamos saldados.</div>`;
+    }
+
+    document.getElementById('addLoanBtn').addEventListener('click', () => {
+      let isSwitchOn = true;
+      const typeLabel = curLoanType === 'a_pagar' ? 'A Pagar (Entra plata hoy)' : 'Otorgado (Sale plata hoy)';
+      openModal(`
+        <h3>Nuevo Préstamo</h3>
+        <label>${curLoanType === 'a_pagar' ? '¿A quién le debes?' : '¿Quién te debe?'}</label>
+        <input type="text" id="lpName" placeholder="Ej: Banco, Tarjeta o Persona..." autofocus>
+        
+        <label>Capital (Dinero real)</label>
+        <input type="number" id="lpCapital" min="0" step="0.01" placeholder="0">
+        
+        <label>Total a devolver (Con intereses)</label>
+        <input type="number" id="lpTotal" min="0" step="0.01" placeholder="0">
+        
+        <div class="settings-row" style="margin-top:20px; padding:12px; margin-bottom:0; box-shadow:none; background:var(--paper);">
+          <div>
+            <div class="st-label" style="font-size:13px; font-weight:600;">Afectar balance hoy</div>
+            <div class="st-sub" style="font-size:11.5px; line-height:1.3;">Suma o resta el capital en tus movimientos para ajustar tu dinero en mano actual.</div>
+          </div>
+          <button class="switch on" id="lpSwitch"></button>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-cancel" id="lpCancel">Cancelar</button>
+          <button class="btn-confirm" id="lpSave">Guardar</button>
+        </div>
+      `);
+
+      const switchBtn = document.getElementById('lpSwitch');
+      switchBtn.addEventListener('click', () => {
+        isSwitchOn = !isSwitchOn;
+        switchBtn.classList.toggle('on', isSwitchOn);
+      });
+
+      document.getElementById('lpCancel').addEventListener('click', closeModal);
+      document.getElementById('lpSave').addEventListener('click', () => {
+        const name = document.getElementById('lpName').value.trim();
+        const capital = parseFloat(document.getElementById('lpCapital').value);
+        let total = parseFloat(document.getElementById('lpTotal').value);
+        
+        if(!name || !capital || capital <= 0) return;
+        if(!total || total < capital) total = capital;
+
+        const loan = {
+          id: Date.now(),
+          type: curLoanType,
+          name: name,
+          capital: capital,
+          total: total,
+          paid: 0,
+          date: new Date().toISOString().slice(0,10)
+        };
+
+        loans.push(loan);
+        saveLoans();
+
+        // Si afecta balance, registrar movimiento
+        if(isSwitchOn){
+          const txType = curLoanType === 'a_pagar' ? 'ingreso' : 'gasto';
+          const cat = curLoanType === 'a_pagar' ? 'prestamo_recibido' : 'prestamo_otorgado';
+          const desc = `Préstamo: ${name}`;
+          
+          txs.push({
+            id: Date.now() + 1,
+            type: txType,
+            category: cat,
+            amount: capital,
+            desc: desc,
+            date: loan.date,
+            photo: null
+          });
+          saveTx();
+        }
+
+        closeModal();
+        renderAll();
+      });
+    });
+
+    function openPayInstallment(loan){
+      const title = loan.type === 'a_pagar' ? 'Pagar cuota' : 'Cobrar cuota';
+      const maxToPay = loan.total - loan.paid;
+
+      openModal(`
+        <h3>${title}</h3>
+        <p style="font-size:13.5px;color:var(--ink-soft);text-align:center;margin-bottom:12px;">
+          Entidad: <strong>${loan.name}</strong><br>Saldo pendiente: ${fmt(maxToPay)}
+        </p>
+        <label>Monto de la cuota</label>
+        <input type="number" id="payAmt" min="0" step="0.01" placeholder="0" autofocus>
+        
+        <p style="font-size:11.5px;color:var(--ink-soft);margin-top:14px;text-align:center;">
+          Esta acción actualizará la barra de progreso y agregará un ${loan.type === 'a_pagar' ? 'gasto' : 'ingreso'} automático en tu mes actual.
+        </p>
+
+        <div class="modal-actions">
+          <button class="btn-cancel" id="payCancel">Cancelar</button>
+          <button class="btn-confirm" id="payConfirm">Confirmar</button>
+        </div>
+      `);
+
+      document.getElementById('payCancel').addEventListener('click', closeModal);
+      document.getElementById('payConfirm').addEventListener('click', ()=>{
+        const amt = parseFloat(document.getElementById('payAmt').value);
+        if(!amt || amt <= 0) return;
+
+        // Actualizar préstamo
+        loan.paid += amt;
+        saveLoans();
+
+        // Registrar movimiento
+        const txType = loan.type === 'a_pagar' ? 'gasto' : 'ingreso';
+        const cat = loan.type === 'a_pagar' ? 'pago_cuota' : 'cobro_cuota';
+        const todayStr = new Date().toISOString().slice(0,10);
+        
+        txs.push({
+          id: Date.now(),
+          type: txType,
+          category: cat,
+          amount: amt,
+          desc: `Cuota de: ${loan.name}`,
+          date: todayStr,
+          photo: null
+        });
+        saveTx();
+
+        closeModal();
+        renderAll();
+
+        if(loan.paid >= loan.total){
+          setTimeout(()=>{
+            openModal(`
+              <h3>¡Préstamo Saldado! 🎉</h3>
+              <p style="font-size:13.5px;color:var(--ink-soft);text-align:center;">El préstamo de <strong>${loan.name}</strong> ha sido completamente liquidado y movido al historial.</p>
+              <div class="modal-actions"><button class="btn-confirm" id="salOk" style="width:100%;">Excelente</button></div>
+            `);
+            document.getElementById('salOk').addEventListener('click', closeModal);
+          }, 300);
+        }
+      });
+    }
+
     document.getElementById('closePhotoView').addEventListener('click', ()=>{
       document.getElementById('photoViewOverlay').classList.remove('open');
     });
 
-    function renderAll(){ renderMonthLabel(); renderSummary(); renderTxList(); }
+    function renderAll(){ 
+      renderMonthLabel(); 
+      renderSummary(); 
+      renderTxList(); 
+      renderLoans();
+    }
 
     // ================= Navegación de vistas =================
     function showView(name, isTab){
@@ -1220,12 +1517,12 @@
 
       const byCat = {};
       monthTxs.filter(t=>t.type==='gasto').forEach(t=>{
-        const topId = topParent(t.category);
+        const topId = (t.category.includes('prestamo') || t.category.includes('cuota')) ? t.category : topParent(t.category);
         byCat[topId] = (byCat[topId]||0) + t.amount;
       });
       const entries = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
       const catRows = entries.length ? entries.map(([id,amt])=>{
-        const meta = catMap['gasto:'+id] || {name:id};
+        const meta = catMap['gasto:'+id] || catMap['ingreso:'+id] || {name:id};
         return `<div class="receipt-cat-row"><span>${meta.name}</span><span>${fmt(amt)}</span></div>`;
       }).join('') : '<div class="receipt-cat-row" style="color:#999;">Sin gastos registrados</div>';
 
@@ -1271,7 +1568,6 @@
         const dataUrl = canvas.toDataURL('image/png');
         const filename = 'cierre-'+monthNames[cur.getMonth()]+'-'+cur.getFullYear()+'.png';
 
-        // Si existe el puente nativo de Android, lo usamos directamente
         if(window.AndroidBridge){
           if(mode==='share'){
             window.AndroidBridge.shareImage(dataUrl, filename);
@@ -1280,7 +1576,6 @@
             closeModal();
           }
         } else {
-          // Respaldo por si se abre en un navegador web común
           if(mode==='share'){
             canvas.toBlob(blob=>{
               const file = new File([blob], filename, {type:'image/png'});
